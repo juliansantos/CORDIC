@@ -3267,30 +3267,118 @@ START:
 main:
 		JSR fetch_coordinates
 		JSR calc_delta_lat
-;		JSR calc_delta_long
+		JSR calc_delta_long
+;		LDA #5
+		;STA signos
+		;CLRA  
+		;CMP signos
+
+		;BGE main
+		;nop
+		;nop
 		JMP main
 
-;**********************************Delta Latitudes subroutine*************
+
+;**********************************DELTA LONGITUDES SUBROUTINE*****************************************
+calc_delta_long:
+	LDA longitude1+0
+	CMP longitude2+0
+	BEQ cmo2 
+	BHI long1glong2 ; lat1 > lat2
+	BRA long2glong1
+cmo2:LDA longitude1+1
+	CMP longitude2+1
+	BEQ cmo3       
+	BHI long1glong2 ; lat1 > lat2
+	BRA long2glong1 ; lat2 > lat1
+cmo3:LDA longitude1+2
+	CMP longitude2+2
+	BEQ cmo4       
+	BHI long1glong2 ; lat1 > lat2
+	BRA long2glong1 ; lat2 > lat1	
+cmo4:LDA longitude1+3
+	CMP longitude2+3
+	BEQ long1glong2 ; lat1=lat2
+	BHI long1glong2 ; lat1 > lat2
+	BRA long2glong1 ; lat2 > lat1	 
+	
+;tmp=lat1 and tmp_1=lat2
+long1glong2:	 
+	LDA longitude1+0 ;Latitude 1 to tmp
+	STA tmp+0
+	LDA longitude1+1
+	STA tmp+1
+	LDA longitude1+2
+	STA tmp+2
+	LDA longitude1+3
+	STA tmp+3
+	
+	LDA longitude2+0 ;Latitude 2 to tmp_1 
+	STA tmp_1+0
+	LDA longitude2+1
+	STA tmp_1+1
+	LDA longitude2+2
+	STA tmp_1+2
+	LDA longitude2+3
+	STA tmp_1+3
+	JSR operationlon
+	BRA load_delta_long
+
+;tmp=lat2 and tmp_1=lat1
+long2glong1:	 
+	LDA longitude2+0 ;Latitude 1 to tmp
+	STA tmp+0
+	LDA longitude2+1
+	STA tmp+1
+	LDA longitude2+2
+	STA tmp+2
+	LDA longitude2+3
+	STA tmp+3
+	
+	LDA longitude1+0 ;Latitude 2 to tmp_1 
+	STA tmp_1+0
+	LDA longitude1+1
+	STA tmp_1+1
+	LDA longitude1+2
+	STA tmp_1+2
+	LDA longitude1+3
+	STA tmp_1+3
+	JSR operationlon
+	BRA load_delta_long
+	
+load_delta_long: ; Subroutine to charge the result in the final register
+	LDA tmp+0
+	STA delta_long+0
+	LDA tmp+1
+	STA delta_long+1
+	LDA tmp+2
+	STA delta_long+2
+	LDA tmp+3
+	STA delta_long+3
+	RTS	
+	
+
+;**********************************DELTA LATITUDES SUBROUTINE******************************************
 calc_delta_lat:
 	LDA latitude1+0
 	CMP latitude2+0
 	BEQ cm2 
-	BGE lat1glat2 ; lat1 > lat2
+	BHI lat1glat2 ; lat1 > lat2
 	BRA lat2glat1
 cm2:LDA latitude1+1
 	CMP latitude2+1
 	BEQ cm3       
-	BGE lat1glat2 ; lat1 > lat2
+	BHI lat1glat2 ; lat1 > lat2
 	BRA lat2glat1 ; lat2 < lat1
 cm3:LDA latitude1+2
 	CMP latitude2+2
 	BEQ cm4       
-	BGE lat1glat2 ; lat1 > lat2
+	BHI lat1glat2 ; lat1 > lat2
 	BRA lat2glat1 ; lat2 < lat1	
 cm4:LDA latitude1+3
 	CMP latitude2+3
 	BEQ lat1glat2 ; lat1=lat2
-	BGE lat1glat2 ; lat1 > lat2
+	BHI lat1glat2 ; lat1 > lat2
 	BRA lat2glat1 ; lat2 < lat1	 
 	
 ;tmp=lat1 and tmp_1=lat2
@@ -3312,7 +3400,8 @@ lat1glat2:
 	STA tmp_1+2
 	LDA latitude2+3
 	STA tmp_1+3
-	BRA operation
+	JSR operation
+	BRA load_delta_lat
 
 ;tmp=lat2 and tmp_1=lat1
 lat2glat1:	 
@@ -3333,8 +3422,19 @@ lat2glat1:
 	STA tmp_1+2
 	LDA latitude1+3
 	STA tmp_1+3
-	BRA operation
+	JSR operation
+	BRA load_delta_lat
 	
+load_delta_lat: ; Subroutine to charge the result in the final register
+	LDA tmp+0
+	STA delta_lat+0
+	LDA tmp+1
+	STA delta_lat+1
+	LDA tmp+2
+	STA delta_lat+2
+	LDA tmp+3
+	STA delta_lat+3
+	RTS	
 operation:	;signo(LAT1) = signo(LAT2)
 	BRCLR LAT1,signos,t1
 	BRSET LAT1,signos,t2
@@ -3343,6 +3443,14 @@ t1:	BRCLR LAT2,signos,sub_32bit
 t2: BRSET LAT2,signos,sub_32bit
 	BRA add_32bit	
 	
+operationlon:	;signo(LAT1) = signo(LAT2)
+	BRCLR LONG1,signos,t1l
+	BRSET LONG1,signos,t2l
+t1l: BRCLR LONG2,signos,sub_32bit
+	JMP add_32bit
+t2l: BRSET LONG2,signos,sub_32bit
+	JMP add_32bit		
+;****************************ADDITION AND SUBTRACTION (32bit) SUBROUTINES*********************	
 add_32bit: ; tmp + tmp_1
 	LDA tmp+3
 	ADD tmp_1+3
@@ -3537,10 +3645,10 @@ Fin:   ;JMP Fin
 
 		 
 ;****************************COORDINATES****************************** 
-LONGITUDE_1: FCB '15.58978',0;  
-LATITUDE_1:  FCB '57.56321',0;
-LONGITUDE_2: FCB '-180.99999',0;
-LATITUDE_2:  FCB '-23.15974',0;
+LONGITUDE_1: FCB '50.58978',0;  
+LATITUDE_1:  FCB '157.56321',0;
+LONGITUDE_2: FCB '80.99999',0;
+LATITUDE_2:  FCB '179.15974',0;
 
 ;*******************************ARCTAN********************************
 ARCTAN: FCB '45.00000',0,'26.56505',0,'14.03624',0,'7.12501',0
