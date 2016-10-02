@@ -3,14 +3,17 @@ LONG1 EQU 0
 LONG2 EQU 1
 LAT1 EQU 2
 LAT2 EQU 3
+FLAGADD EQU 4 ; Add or Substraction
             XDEF START
             ABSENTRY START
 
             ORG     0B0H          ; Insert your data definition here
-longitud1 DS 4
-latitud1 DS 4
-longitud2 DS 4
-latitud2 DS 4
+longitude1 DS 4
+latitude1 DS 4
+longitude2 DS 4
+latitude2 DS 4
+delta_lat DS 4
+delta_long DS 4
 signos DS 1	
 tmp	DS 4
 tmp_1	DS 4
@@ -23,10 +26,181 @@ START:
             TXS
 
 main:
-		LDHX #LONGITUDE_2
+		JSR fetch_coordinates
+		JSR calc_delta_lat
+;		JSR calc_delta_long
+		JMP main
 
-		JSR fetch_xy     
-        BRA    main
+;**********************************Delta Latitudes subroutine*************
+calc_delta_lat:
+	LDA latitude1+0
+	CMP latitude2+0
+	BEQ cm2 
+	BGE lat1glat2 ; lat1 > lat2
+	BRA lat2glat1
+cm2:LDA latitude1+1
+	CMP latitude2+1
+	BEQ cm3       
+	BGE lat1glat2 ; lat1 > lat2
+	BRA lat2glat1 ; lat2 < lat1
+cm3:LDA latitude1+2
+	CMP latitude2+2
+	BEQ cm4       
+	BGE lat1glat2 ; lat1 > lat2
+	BRA lat2glat1 ; lat2 < lat1	
+cm4:LDA latitude1+3
+	CMP latitude2+3
+	BEQ lat1glat2 ; lat1=lat2
+	BGE lat1glat2 ; lat1 > lat2
+	BRA lat2glat1 ; lat2 < lat1	 
+	
+;tmp=lat1 and tmp_1=lat2
+lat1glat2:	 
+	LDA latitude1+0 ;Latitude 1 to tmp
+	STA tmp+0
+	LDA latitude1+1
+	STA tmp+1
+	LDA latitude1+2
+	STA tmp+2
+	LDA latitude1+3
+	STA tmp+3
+	
+	LDA latitude2+0 ;Latitude 2 to tmp_1 
+	STA tmp_1+0
+	LDA latitude2+1
+	STA tmp_1+1
+	LDA latitude2+2
+	STA tmp_1+2
+	LDA latitude2+3
+	STA tmp_1+3
+	BRA operation
+
+;tmp=lat2 and tmp_1=lat1
+lat2glat1:	 
+	LDA latitude2+0 ;Latitude 1 to tmp
+	STA tmp+0
+	LDA latitude2+1
+	STA tmp+1
+	LDA latitude2+2
+	STA tmp+2
+	LDA latitude2+3
+	STA tmp+3
+	
+	LDA latitude1+0 ;Latitude 2 to tmp_1 
+	STA tmp_1+0
+	LDA latitude1+1
+	STA tmp_1+1
+	LDA latitude1+2
+	STA tmp_1+2
+	LDA latitude1+3
+	STA tmp_1+3
+	BRA operation
+	
+operation:	;signo(LAT1) = signo(LAT2)
+	BRCLR LAT1,signos,t1
+	BRSET LAT1,signos,t2
+t1:	BRCLR LAT2,signos,sub_32bit
+	BRA add_32bit
+t2: BRSET LAT2,signos,sub_32bit
+	BRA add_32bit	
+	
+add_32bit: ; tmp + tmp_1
+	LDA tmp+3
+	ADD tmp_1+3
+	STA tmp+3
+	LDA tmp+2
+	ADC tmp_1+2		
+	STA tmp+2
+	LDA tmp+1
+	ADC tmp_1+1		
+	STA tmp+1
+	LDA tmp+0
+	ADC tmp_1+0		
+	STA tmp+0	
+	RTS
+sub_32bit: ; tmp - tmp_1
+	LDA tmp+3
+	SUB tmp_1+3
+	STA tmp+3
+	LDA tmp+2
+	SBC tmp_1+2		
+	STA tmp+2
+	LDA tmp+1
+	SBC tmp_1+1		
+	STA tmp+1
+	LDA tmp+0
+	SBC tmp_1+0		
+	STA tmp+0	
+	RTS
+	
+;*************SUBROUTINE TO OBTAIN COORDINATES*********************************************************  
+fetch_coordinates:		
+		CLRA 
+		STA signos
+		
+		LDHX #LONGITUDE_1   ; Load direction of LONGITUDE_1
+		JSR fetch_xy     	; obtaining data 
+		LDA tmp_1+0			; charging data
+		STA longitude1+0
+		LDA tmp_1+1
+		STA longitude1+1
+		LDA tmp_1+2
+		STA longitude1+2
+		LDA tmp_1+3
+		STA longitude1+3
+		BRCLR 7,signos,zl1 ; setting sing of longitude 1
+		BSET LONG1,signos
+	zl1: BRSET 7,signos,ol1
+		BCLR LONG1,signos
+	ol1:	
+		LDHX #LATITUDE_1    ; Load direction of LATITUDE_1
+		JSR fetch_xy     	; obtaining data 
+		LDA tmp_1+0			; charging data
+		STA latitude1+0
+		LDA tmp_1+1
+		STA latitude1+1
+		LDA tmp_1+2
+		STA latitude1+2
+		LDA tmp_1+3
+		STA latitude1+3
+		BRCLR 7,signos,zla1 ; setting sing of latitude 1
+		BSET LAT1,signos
+	zla1: BRSET 7,signos,ola1
+		BCLR LAT1,signos
+	ola1:		
+		
+		LDHX #LONGITUDE_2   ; Load direction of LONGITUDE_2
+		JSR fetch_xy     	; obtaining data 
+		LDA tmp_1+0			; charging data
+		STA longitude2+0
+		LDA tmp_1+1
+		STA longitude2+1
+		LDA tmp_1+2
+		STA longitude2+2
+		LDA tmp_1+3
+		STA longitude2+3
+		BRCLR 7,signos,zl2 ; setting sing of longitude 2
+		BSET LONG2,signos
+	zl2: BRSET 7,signos,ol2
+		BCLR LONG2,signos
+	ol2:		
+
+		LDHX #LATITUDE_2    ; Load direction of LATITUDE_2
+		JSR fetch_xy     	; obtaining data 
+		LDA tmp_1+0			; charging data
+		STA latitude2+0
+		LDA tmp_1+1
+		STA latitude2+1
+		LDA tmp_1+2
+		STA latitude2+2
+		LDA tmp_1+3
+		STA latitude2+3	
+		BRCLR 7,signos,zla2 ; setting sing of latitude 2
+		BSET LAT2,signos
+	zla2: BRSET 7,signos,ola2
+		BCLR LAT2,signos
+	ola2:			
+        RTS
             
 ;*************SUBROUTINE TO OBTAIN DATA FROM TABLES******************            
 fetch_xy:  
@@ -39,10 +213,10 @@ fetch_xy:
 		STA tmp_1+2 ;clear tmp+2
 		STA tmp_1+1 ;clear tmp+1
 		STA tmp_1+0 ;clear tmp+0
-		STA signos ;clear signos
+		;BCLR 7,signos ;clear signos
 		LDA ,X ; dereferencing pointer
  		CBEQA #'-',Negative ; if is negative branch
-Positive:  BCLR 5,signos ; it has been detected a positive number
+Positive:  BCLR 7,signos ; it has been detected a positive number
  		BRA ascii2dec ; goto ascii to decimal conversion 	
 Negative:  BSET 7,signos ; it has been detected a negative number 
 		AIX #01H ; increment pointer	
@@ -119,16 +293,21 @@ mul10:   LDX tmp+3 ; byte 1 * 10
 	   STA tmp+0
 	   PULX ; Restoring context
 	   BRA bucle
-Fin:   JMP Fin	   
+Fin:   ;JMP Fin	   
 	   RTS ; return from subroutine 
 
 		 
-;****************************COORDENADAS****************************** 
-LONGITUDE_1: FCB '-15.58978',0;  
+;****************************COORDINATES****************************** 
+LONGITUDE_1: FCB '15.58978',0;  
 LATITUDE_1:  FCB '57.56321',0;
-LONGITUDE_2: FCB '180.99999',0;
-LATITUDE2_:  FCB '23.15974',0;
+LONGITUDE_2: FCB '-180.99999',0;
+LATITUDE_2:  FCB '-23.15974',0;
 
+;*******************************ARCTAN********************************
+ARCTAN: FCB '45.00000',0,'26.56505',0,'14.03624',0,'7.12501',0
+		FCB '3.57633',0,'1.78991',0,'0.89517',0,'0.44761',0
+		FCB '0.22381',0,'0.11190',0,'0.05595',0,'0.02797',0
+		FCB '0.01398',0,'0.00699',0,'0.003497',0,'0.00174',0 
 			
             ORG	0FFFEH
 			FCB START			; Reset
