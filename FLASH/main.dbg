@@ -3247,15 +3247,20 @@ FLAGADD EQU 4 ; Add or Substraction
             ABSENTRY START
 
             ORG     0B0H          ; Insert your data definition here
-longitude1 DS 4
+longitude1 DS 4 
 latitude1 DS 4
 longitude2 DS 4
 latitude2 DS 4
 delta_lat DS 4
 delta_long DS 4
 signos DS 1	
+magnitud DS 6
 tmp	DS 4
-tmp_1	DS 4
+tmp_1 DS 4
+tmp_2 DS 4
+tmp_3 DS 4
+temp DS 6
+counter DS 1
 
             ORG    0C000H
 START:	
@@ -3266,19 +3271,305 @@ START:
 
 main:
 		JSR fetch_coordinates
-		JSR calc_delta_lat
-		JSR calc_delta_long
-;		LDA #5
-		;STA signos
-		;CLRA  
-		;CMP signos
-
-		;BGE main
-		;nop
-		;nop
+		JSR calc_delta_lat ;Phi
+		JSR calc_delta_long ;Lamda
+		;JSR calc_media_lat
+		JSR calc_magnitude ; Magnitude/0.60725
+		;JSR 
 		JMP main
 
+;**********************************MAGNITUD VECTOR SUBROUTINE******************************************
+;X0=magnitud <=delta_lat ; Y0=tmp_2 <= delta_long
+calc_magnitude:
+	LDA delta_lat+0 
+	STA magnitud+0 ; Initializing X
+	LDA delta_lat+1
+	STA magnitud+1
+	LDA delta_lat+2
+	STA magnitud+2
+	LDA delta_lat+3
+	STA magnitud+3
+	
+	LDA delta_long+0 
+	STA tmp_2+0 ; Initializing Y
+	LDA delta_long+1
+	STA tmp_2+1
+	LDA delta_long+2
+	STA tmp_2+2
+	LDA delta_long+3
+	STA tmp_2+3
+	
+	CLRA ; Initializing i
+	STA counter 
+	
+cycle:	JSR calc_xi ; calculate new x_i
+	LDA tmp+0 ; Load new x_i 
+	STA magnitud+0
+	LDA tmp+1
+	STA magnitud+1
+	LDA tmp+2
+	STA magnitud+2
+	LDA tmp+3
+	STA magnitud+3
+		
+	JSR calc_yi ; Calculate new y_i
+	LDA tmp+0 ; Load new y_i 
+	STA tmp_2+0
+	LDA tmp+1
+	STA tmp_2+1
+	LDA tmp+2
+	STA tmp_2+2
+	LDA tmp+3
+	STA tmp_2+3
+	
+	INC counter
+	LDA #32
+	CBEQ counter,xyfin
+	BRA cycle
+xyfin:
+		
+	LDA magnitud+3
+	STA magnitud+5
+	LDA magnitud+2
+	STA magnitud+4
+	LDA magnitud+1
+	STA magnitud+3
+	CLRA 
+	STA magnitud+0
+	STA magnitud+1
+	STA magnitud+2
+	JSR mult32_16 	
+	RTS
+;*****************************************multiplication subroutine***********
+mult32_16:
+	   CLRA 
+	   STA temp+5 ; initialization 
+	   STA temp+4
+	   STA temp+3
+	   STA temp+2
+	   STA temp+1
+	   STA temp+0
+	   
+       LDX magnitud+5 
+	   LDA #35H				
+	   MUL  			;byte 6
+	   STA temp+5
+	   TXA  ; X=A
+	   STA temp+4
+	   
+	   LDX magnitud+4 ; byte 5 
+	   LDA #35H
+	   MUL ; tmp2
+	   ADD temp+4
+	   STA temp+4
+	   TXA ; A=X
+	   ADC temp+3 ; add carry
+	   STA temp+3
+	   CLRA 
+	   ADC temp+2 ; add carry
+	   STA temp+2
+	   CLRA 
+	   ADC temp+1 ; add carry
+	   STA temp+1
+	   CLRA 
+	   ADC temp+0 ; add carry
+	   STA temp+0
+	   	   			   
+	   LDX magnitud+3 ; byte 4
+	   LDA #35H
+	   MUL 
+       ADD temp+3
+	   STA temp+3
+	   TXA ; A=X
+	   ADC temp+2 ; add carry
+	   STA temp+2
+	   CLRA 
+	   ADC temp+1 ; add carry
+	   STA temp+1
+	   CLRA 
+	   ADC temp+0 ; add carry
+	   STA temp+0
 
+	   LDX magnitud+2 ; byte 3
+	   LDA #35H
+	   MUL 
+       ADD temp+2
+	   STA temp+2
+	   TXA ; A=X
+	   ADC temp+1 ; add carry
+	   STA temp+1
+	   CLRA 
+	   ADC temp+0 ; add carry
+	   STA temp+0
+;;;;mul f
+	   LDX magnitud+5 ; byte 6 
+	   LDA #0EDH
+	   MUL ; tmp2
+	   ADD temp+4
+	   STA temp+4
+	   TXA ; A=X
+	   ADC temp+3 ; add carry
+	   STA temp+3
+	   CLRA 
+	   ADC temp+2 ; add carry
+	   STA temp+2
+	   CLRA 
+	   ADC temp+1 ; add carry
+	   STA temp+1
+	   CLRA 
+	   ADC temp+0 ; add carry
+	   STA temp+0
+
+	   LDX magnitud+4 ; byte 5 
+	   LDA #0EDH
+	   MUL ; tmp2
+	   ADD temp+3
+	   STA temp+3
+	   TXA ; A=X
+	   ADC temp+2 ; add carry
+	   STA temp+2
+	   CLRA 
+	   ADC temp+1 ; add carry
+	   STA temp+1
+	   CLRA 
+	   ADC temp+0 ; add carry
+	   STA temp+0
+	   
+	   LDX magnitud+3 ; byte 4 
+	   LDA #0EDH
+	   MUL ; tmp2
+	   ADD temp+2
+	   STA temp+2
+	   TXA ; A=X
+	   ADC temp+1 ; add carry
+	   STA temp+1
+	   CLRA 
+	   ADC temp+0 ; add carry
+	   STA temp+0
+	   
+	   LDX magnitud+2 ; byte 4 
+	   LDA #0EDH
+	   MUL ; tmp2
+	   ADD temp+1
+	   STA temp+1
+	   TXA ; A=X
+	   ADC temp+0 ; add carry
+	   STA temp+0	      
+	   RTS
+
+;*******************************************Xi SUBROUTINE**********************	
+calc_xi:
+	LDA tmp_2+0 ; tmp = magnitud 
+	STA tmp+0
+	LDA tmp_2+1
+	STA tmp+1
+	LDA tmp_2+2
+	STA tmp+2
+	LDA tmp_2+3
+	STA tmp+3	
+	
+	LDA counter
+rot:	CBEQA #0,cal_mag
+	LSR tmp+0 ; yi/2
+	ROR tmp+1
+	ROR tmp+2
+	ROR tmp+3
+	DECA 
+	BRA rot
+		
+cal_mag:	LDA magnitud+0 ; tmp = magnitud 
+	STA tmp_1+0
+	STA tmp_3+0
+	LDA magnitud+1
+	STA tmp_1+1
+	STA tmp_3+1 
+	LDA magnitud+2
+	STA tmp_1+2
+	STA tmp_3+2
+	LDA magnitud+3
+	STA tmp_1+3
+	STA tmp_3+3
+	JSR add_32bit ; add the numbehs 
+	RTS
+
+;**********************************************CALC  Yi SUBROUTINE	
+calc_yi:	
+	LDA tmp_3+0 ; tmp = magnitud 
+	STA tmp+0
+	LDA tmp_3+1
+	STA tmp+1
+	LDA tmp_3+2
+	STA tmp+2
+	LDA tmp_3+3
+	STA tmp+3	
+	
+	LDA counter
+rot1:	CBEQA #0,cal_mag1	
+	LSR tmp+0 ; magnitud /2
+	ROR tmp+1
+	ROR tmp+2
+	ROR tmp+3
+	DECA 
+	BRA rot1
+	
+cal_mag1:	 			 			
+	LDA tmp+0 ; Magnitud/2 > tmp_2
+	CMP tmp_2+0
+	BEQ cmy2 
+	BHI magngtmp2 ; Magnitud/2 > tmp_2
+	JMP long2glong1
+cmy2:LDA tmp+1
+	CMP tmp_2+1
+	BEQ cmy3       
+	BHI magngtmp2 ;  Magnitud/2 > tmp_2
+	BRA tmp2gmagn ;  Magnitud/2 < tmp_2
+cmy3:LDA tmp+2
+	CMP tmp_2+2
+	BEQ cmy4       
+	BHI magngtmp2 ;  Magnitud/2 > tmp_2
+	BRA tmp2gmagn ;  Magnitud/2 < tmp_2	
+cmy4:LDA tmp+3
+	CMP tmp_2+3
+	BEQ magngtmp2 ;  Magnitud/2 = tmp_2	
+	BHI magngtmp2 ;  Magnitud/2 > tmp_2
+	BRA tmp2gmagn ;  Magnitud/2 < tmp_2	
+	 			
+magngtmp2:
+	;magnitud/2 - tmp_2
+	LDA tmp_2+0
+	STA tmp_1+0
+	LDA tmp_2+1
+	STA tmp_1+1
+	LDA tmp_2+2
+	STA tmp_1+2
+	LDA tmp_2+3
+	STA tmp_1+3
+	JSR sub_32bit ; substraction magnitud/2 - tmp 2
+	RTS
+	
+tmp2gmagn:
+	;tmp_2 - magnitud/2 
+	LDA tmp+0  ;tmp_1 = magnitud/2
+	STA tmp_1+0
+	LDA tmp+1
+	STA tmp_1+1
+	LDA tmp+2
+	STA tmp_1+2
+	LDA tmp+3
+	STA tmp_1+3
+	
+	LDA tmp_2+0 ;tmp = tmp_2
+	STA tmp+0
+	LDA tmp_2+1
+	STA tmp+1
+	LDA tmp_2+2
+	STA tmp+2
+	LDA tmp_2+3
+	STA tmp+3	 			
+	
+	JSR sub_32bit	
+	RTS
+		
 ;**********************************DELTA LONGITUDES SUBROUTINE*****************************************
 calc_delta_long:
 	LDA longitude1+0
@@ -3645,16 +3936,16 @@ Fin:   ;JMP Fin
 
 		 
 ;****************************COORDINATES****************************** 
-LONGITUDE_1: FCB '50.58978',0;  
-LATITUDE_1:  FCB '157.56321',0;
-LONGITUDE_2: FCB '80.99999',0;
-LATITUDE_2:  FCB '179.15974',0;
+LONGITUDE_1: FCB '4.00000',0;  
+LATITUDE_1:  FCB '3.00000',0;
+LONGITUDE_2: FCB '0.00000',0;
+LATITUDE_2:  FCB '00.00000',0;
 
 ;*******************************ARCTAN********************************
-ARCTAN: FCB '45.00000',0,'26.56505',0,'14.03624',0,'7.12501',0
-		FCB '3.57633',0,'1.78991',0,'0.89517',0,'0.44761',0
-		FCB '0.22381',0,'0.11190',0,'0.05595',0,'0.02797',0
-		FCB '0.01398',0,'0.00699',0,'0.003497',0,'0.00174',0 
+ARCTAN: FCB '45.00000',0,'26.56505',0,'14.03624',0,'7.12501',0 ;4 values
+		FCB '3.57633',0,'1.78991',0,'0.89517',0,'0.44761',0 ;4 values
+		FCB '0.22381',0,'0.11190',0,'0.05595',0,'0.02797',0 ;4 values
+		FCB '0.01398',0,'0.00699',0,'0.003497',0,'0.00174',0  ;4 values
 			
             ORG	0FFFEH
 			FCB START			; Reset
