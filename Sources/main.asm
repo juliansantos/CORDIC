@@ -95,11 +95,24 @@ xyfin:
 	STA magnitud+4
 	LDA magnitud+1
 	STA magnitud+3
+	LDA magnitud+0
+	STA magnitud+2
 	CLRA 
 	STA magnitud+0
 	STA magnitud+1
-	STA magnitud+2
 	JSR mult32_16 	
+	LDA temp+5
+	STA magnitud+5
+	LDA temp+4
+	STA magnitud+4
+	LDA temp+3
+	STA magnitud+3
+	LDA temp+2
+	STA magnitud+2
+	LDA temp+1
+	STA magnitud+1
+	LDA temp+0
+	STA magnitud+0
 	RTS
 ;*****************************************multiplication subroutine***********
 mult32_16:
@@ -278,7 +291,7 @@ cal_mag1:
 	CMP tmp_2+0
 	BEQ cmy2 
 	BHI magngtmp2 ; Magnitud/2 > tmp_2
-	JMP long2glong1
+	JMP tmp2gmagn
 cmy2:LDA tmp+1
 	CMP tmp_2+1
 	BEQ cmy3       
@@ -697,10 +710,10 @@ Fin:   ;JMP Fin
 
 		 
 ;****************************COORDINATES****************************** 
-LONGITUDE_1: FCB '4.00000',0;  
-LATITUDE_1:  FCB '3.00000',0;
-LONGITUDE_2: FCB '0.00000',0;
-LATITUDE_2:  FCB '00.00000',0;
+LONGITUDE_1: FCB '0.00000',0;  
+LATITUDE_1:  FCB '0.00000',0;
+LONGITUDE_2: FCB '-180.00000',0;
+LATITUDE_2:  FCB '-180.00000',0;
 
 ;*******************************ARCTAN********************************
 ARCTAN: FCB '45.00000',0,'26.56505',0,'14.03624',0,'7.12501',0 ;4 values
