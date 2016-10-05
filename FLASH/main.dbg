@@ -3243,6 +3243,7 @@ LONG2 EQU 1
 LAT1 EQU 2
 LAT2 EQU 3
 FLAGADD EQU 4 ; Add or Substraction
+Z EQU 5
             XDEF START
             ABSENTRY START
 
@@ -3255,14 +3256,30 @@ delta_lat DS 4
 delta_long DS 4
 signos DS 1	
 magnitud DS 6
+media_lat DS 4
 tmp	DS 4
 tmp_1 DS 4
 tmp_2 DS 4
 tmp_3 DS 4
 temp DS 6
 counter DS 1
+ascii_dist DS 12
+arctan DS 4
+sin DS 4
+cos DS 4
+x_1 DS 4
+y DS 4
+z DS 4
 
             ORG    0C000H
+		 
+;****************************COORDINATES****************************** 
+LONGITUDE_1: FCB '0.00000',0;  
+LATITUDE_1:  FCB '0.00000',0;
+LONGITUDE_2: FCB '0.00000',0;
+LATITUDE_2:  FCB '0.00000',0;
+
+            
 START:	
 			CLRA 
             STA  	SOPT1  ; Disenable COP
@@ -3270,14 +3287,630 @@ START:
             TXS
 
 main:
-		JSR fetch_coordinates
+		JSR fetch_coordinates 
 		JSR calc_delta_lat ;Phi
 		JSR calc_delta_long ;Lamda
-		;JSR calc_media_lat
+		JSR calc_media_lat
+		JSR calc_trig
 		JSR calc_magnitude ; Magnitude/0.60725
-		;JSR 
+		;JSR calc_dist
+		JSR hex_2ascii
 		JMP main
+		
+;*********************************TRIGONOMETRIC FUCTION CALCULATION***********************************
+calc_trig:
+		CLRA 
+		STA counter ; initializing counter
+		STA y+0 ; initial y
+		STA y+1
+		STA y+2
+		STA y+3
+		STA x_1+0 ; initial x
+		STA x_1+1
+		LDA #0EDH
+		STA x_1+2
+		LDA #35H
+		STA x_1+3
+		LDA media_lat+0 ;initial z
+		STA z+0
+		LDA media_lat+1
+		STA z+1
+		LDA media_lat+2
+		STA z+2
+		LDA media_lat+3
+		STA z+3
+		BCLR Z,signos  ; initial sign of z
+		
+rsta:		BRSET Z,signos,PT1 ;
+PT2:
+;**********************************************CALC  Yi	
+	LDA x_1 ; tmp = x
+	STA tmp+0
+	LDA x_1+1
+	STA tmp+1
+	LDA x_1+2
+	STA tmp+2
+	LDA x_1+3
+	STA tmp+3	
+	LDA counter
+rot11:	CBEQA #0,cal_mag11	
+	LSR tmp+0 ; x/2
+	ROR tmp+1
+	ROR tmp+2
+	ROR tmp+3
+	DECA 
+	BRA rot11
+PT1: JMP PT11	
+cal_mag11:	 			 			
+	LDA tmp+0 ; x/2 > y
+	CMP y+0
+	BEQ cmy21 
+	BHI xgy ; x/2 > y
+	JMP ygx
+cmy21:LDA tmp+1
+	CMP y+1
+	BEQ cmy31       
+	BHI xgy ;  x/2 > y
+	BRA ygx ;  x/2 < y
+cmy31:LDA tmp+2
+	CMP y+2
+	BEQ cmy41       
+	BHI xgy;  x/2 > y
+	BRA ygx ;  x/2 < y	
+cmy41:LDA tmp+3
+	CMP y+3
+	BEQ xgy ;  x/2 = y	
+	BHI xgy ;  x/2 > y
+	BRA ygx ;  x/2 < y	
+	 			
+xgy:
+	;magnitud/2 - tmp_2
+	LDA y+0
+	STA tmp_1+0
+	STA tmp_3+0
+	LDA y+1
+	STA tmp_1+1
+	STA tmp_3+1
+	LDA y+2
+	STA tmp_1+2
+	STA tmp_3+2
+	LDA y+3
+	STA tmp_1+3
+	STA tmp_3+3
+	JSR sub_32bit 
+	LDA tmp+0 ; load new data  
+	STA y+0
+	LDA tmp+1
+	STA y+1
+	LDA tmp+2
+	STA y+2
+	LDA tmp+3
+	STA y+3
+	JSR xxcal 
+	JMP new_z
+	
+ygx:
+	;y - x/2 
+	LDA tmp+0  
+	STA tmp_1+0
+	LDA tmp+1
+	STA tmp_1+1
+	LDA tmp+2
+	STA tmp_1+2
+	LDA tmp+3
+	STA tmp_1+3
+	
+	LDA y+0 
+	STA tmp+0
+	STA tmp_3+0
+	LDA y+1
+	STA tmp+1
+	STA tmp_3+1
+	LDA y+2
+	STA tmp+2
+	STA tmp_3+2
+	LDA y+3
+	STA tmp+3	
+	STA tmp_3+3 			
+	JSR sub_32bit	
+	LDA tmp+0 ; load new data  
+	STA y+0
+	LDA tmp+1
+	STA y+1
+	LDA tmp+2
+	STA y+2
+	LDA tmp+3
+	STA y+3
+	JSR xxcal
+	JMP new_z
+	
+PT11:
+	LDA y ; tmp = x
+	STA tmp+0
+	LDA y+1
+	STA tmp+1
+	LDA y+2
+	STA tmp+2
+	LDA y+3
+	STA tmp+3	
+	LDA counter
+rot111:	CBEQA #0,cal_mag111	
+	LSR tmp+0 ; x/2
+	ROR tmp+1
+	ROR tmp+2
+	ROR tmp+3
+	DECA 
+	BRA rot111
 
+cal_mag111:	 			 			
+	LDA tmp+0 ; x/2 > y
+	CMP x_1+0
+	BEQ cmy211 
+	BHI xgy1 ; x/2 > y
+	JMP ygx1
+cmy211:LDA tmp+1
+	CMP x_1+1
+	BEQ cmy311       
+	BHI xgy1 ;  x/2 > y
+	BRA ygx1 ;  x/2 < y
+cmy311:LDA tmp+2
+	CMP x_1+2
+	BEQ cmy411       
+	BHI xgy1;  x/2 > y
+	BRA ygx1 ;  x/2 < y	
+cmy411:LDA tmp+3
+	CMP x_1+3
+	BEQ xgy1 ;  x/2 = y	
+	BHI xgy1 ;  x/2 > y
+	BRA ygx1 ;  x/2 < y	
+	 			
+xgy1:
+	;magnitud/2 - tmp_2
+	LDA x_1+0
+	STA tmp_1+0
+	STA tmp_3+0
+	LDA x_1+1
+	STA tmp_1+1
+	STA tmp_3+1
+	LDA x_1+2
+	STA tmp_1+2
+	STA tmp_3+2
+	LDA x_1+3
+	STA tmp_1+3
+	STA tmp_3+3
+	JSR sub_32bit 
+	LDA tmp+0 ; load new data  
+	STA x_1+0
+	LDA tmp+1
+	STA x_1+1
+	LDA tmp+2
+	STA x_1+2
+	LDA tmp+3
+	STA x_1+3
+	JSR xx1cal 
+	BRA new_z
+	
+ygx1:
+	;y - x/2 
+	LDA tmp+0  
+	STA tmp_1+0
+	LDA tmp+1
+	STA tmp_1+1
+	LDA tmp+2
+	STA tmp_1+2
+	LDA tmp+3
+	STA tmp_1+3
+	
+	LDA x_1+0 
+	STA tmp+0
+	STA tmp_3+0
+	LDA x_1+1
+	STA tmp+1
+	STA tmp_3+1
+	LDA x_1+2
+	STA tmp+2
+	STA tmp_3+2
+	LDA x_1+3
+	STA tmp+3	
+	STA tmp_3+3 			
+	JSR sub_32bit	
+	LDA tmp+0 ; load new data  
+	STA x_1+0
+	LDA tmp+1
+	STA x_1+1
+	LDA tmp+2
+	STA x_1+2
+	LDA tmp+3
+	STA x_1+3
+	JSR xx1cal
+	BRA new_z
+
+new_z:
+	JSR OBTTAN
+	JSR CALCZ
+	INC counter
+	LDA counter
+	CMP #23
+	BEQ	aoeu
+	JMP rsta 
+aoeu: JMP FIN	
+CALCZ: ; SUBROUTINE TO SUBSTRACT Z TO ARCTAN
+calsz:	 			 			
+	LDA z+0 ; z > arctan
+	CMP arctan+0 
+	BEQ cz1 
+	BHI zma ; 
+	JMP amz
+cz1:LDA z+1
+	CMP arctan+1
+	BEQ cz2       
+	BHI zma ; 
+	BRA amz ; 
+cz2:LDA z+2
+	CMP arctan+2
+	BEQ cz3       
+	BHI zma;  
+	BRA amz ; 	
+cz3:LDA z+3
+	CMP arctan+3
+	BEQ zma ; 	
+	BHI zma ;  
+	BRA amz ;  	
+
+zma:
+	;BCLR Z,signos
+	LDA arctan+0  
+	STA tmp_1+0
+	LDA arctan+1
+	STA tmp_1+1
+	LDA arctan+2
+	STA tmp_1+2
+	LDA arctan+3
+	STA tmp_1+3
+
+	LDA z+0 
+	STA tmp+0
+	LDA z+1
+	STA tmp+1
+	LDA z+2
+	STA tmp+2
+	LDA z+3
+	STA tmp+3	
+	JSR sub_32bit	
+	LDA tmp+0 ; load new data  
+	STA z+0
+	LDA tmp+1
+	STA z+1
+	LDA tmp+2
+	STA z+2
+	LDA tmp+3
+	STA z+3
+	RTS
+amz:
+	COM signos
+	
+	LDA arctan+0  
+	STA tmp+0
+	LDA arctan+1
+	STA tmp+1
+	LDA arctan+2
+	STA tmp+2
+	LDA arctan+3
+	STA tmp+3
+
+	LDA z+0 
+	STA tmp_1+0
+	LDA z+1
+	STA tmp_1+1
+	LDA z+2
+	STA tmp_1+2
+	LDA z+3
+	STA tmp_1+3	
+	JSR sub_32bit	
+	LDA tmp+0 ; load new data  
+	STA z+0
+	LDA tmp+1
+	STA z+1
+	LDA tmp+2
+	STA z+2
+	LDA tmp+3
+	STA z+3
+	RTS
+		
+FIN:LDA x_1+0
+	STA cos+0
+	LDA x_1+1
+	STA cos+1
+	LDA x_1+2
+	STA cos+2
+	LDA x_1+3
+	STA cos+3 
+	LDA y+0
+	STA sin+0
+	LDA y+1
+	STA sin+1
+	LDA y+2
+	STA sin+2
+	LDA y+3
+	STA sin+3 
+	RTS	
+	
+xxcal:		; x calc 
+	LDA tmp_3+0 
+	STA tmp+0
+	LDA tmp_3+1
+	STA tmp+1
+	LDA tmp_3+2
+	STA tmp+2
+	LDA tmp_3+3
+	STA tmp+3
+	
+	LDA counter
+roty:	CBEQA #0,here2
+	LSR tmp+0 ; x/2
+	ROR tmp+1
+	ROR tmp+2
+	ROR tmp+3
+	DECA 
+	BRA roty
+here2:	
+	LDA x_1+0 
+	STA tmp_1+0
+	LDA x_1+1
+	STA tmp_1+1
+	LDA x_1+2
+	STA tmp_1+2
+	LDA x_1+3
+	STA tmp_1+3
+	
+	JSR add_32bit
+	LDA tmp+0 ; load new data  
+	STA x_1+0
+	LDA tmp+1
+	STA x_1+1
+	LDA tmp+2
+	STA x_1+2
+	LDA tmp+3
+	STA x_1+3	
+	RTS	
+xx1cal:		; x calc 
+	LDA tmp_3+0 
+	STA tmp+0
+	LDA tmp_3+1
+	STA tmp+1
+	LDA tmp_3+2
+	STA tmp+2
+	LDA tmp_3+3
+	STA tmp+3
+	
+	LDA counter
+rotx1:	CBEQA #0,here1	
+	LSR tmp+0 ; x/2
+	ROR tmp+1
+	ROR tmp+2
+	ROR tmp+3
+	DECA 
+	BRA rotx1
+here1:		
+	LDA y+0 
+	STA tmp_1+0
+	LDA y+1
+	STA tmp_1+1
+	LDA y+2
+	STA tmp_1+2
+	LDA y+3
+	STA tmp_1+3
+	
+	JSR add_32bit
+	LDA tmp+0 ; load new data  
+	STA y+0
+	LDA tmp+1
+	STA y+1
+	LDA tmp+2
+	STA y+2
+	LDA tmp+3
+	STA y+3	
+	RTS				
+				
+;****************************************to obtain arctan		
+OBTTAN:		LDHX #ARCTAN ; Load initial direction of ARCTAN
+    	LDA counter
+		STA tmp_2 ;counter=tmp
+		
+t10:	LDA tmp_2
+		CMP #00
+		BEQ loadtan ;0=?
+		
+ti1:	AIX #1
+		LDA ,X ; A=mem(hx)
+		CMP #00 ;
+		BHI ti1
+		DEC tmp_2
+		AIX #1
+		BRA t10 
+		
+loadtan:	JSR fetch_xy     	
+		LDA tmp_1+0			
+		STA arctan+0
+		LDA tmp_1+1
+		STA arctan+1
+		LDA tmp_1+2
+		STA arctan+2
+		LDA tmp_1+3
+		STA arctan+3
+		RTS		
+	
+;*********************************HEX TO ASCII CON****************************************************
+hex_2ascii:
+	LDA magnitud+0 ; BYTE 0
+	STA tmp+0
+	JSR conversion
+	LDA tmp+1
+	STA ascii_dist+0
+	LDA tmp+0
+	STA ascii_dist+1
+	
+	LDA magnitud+1 ; BYTE 1
+	STA tmp+0
+	JSR conversion
+	LDA tmp+1
+	STA ascii_dist+2
+	LDA tmp+0
+	STA ascii_dist+3
+	
+	LDA magnitud+2 ; BYTE 2
+	STA tmp+0
+	JSR conversion
+	LDA tmp+1
+	STA ascii_dist+4
+	LDA tmp+0
+	STA ascii_dist+5
+	
+	LDA magnitud+3 ; BYTE 3
+	STA tmp+0
+	JSR conversion
+	LDA tmp+1
+	STA ascii_dist+6
+	LDA tmp+0
+	STA ascii_dist+7	
+
+	LDA magnitud+4 ; BYTE 4
+	STA tmp+0
+	JSR conversion
+	LDA tmp+1
+	STA ascii_dist+8
+	LDA tmp+0
+	STA ascii_dist+9
+	
+	LDA magnitud+5 ; BYTE 5
+	STA tmp+0
+	JSR conversion
+	LDA tmp+1
+	STA ascii_dist+10
+	LDA tmp+0
+	STA ascii_dist+11			
+	RTS
+
+conversion:
+	LDA tmp+0 ; High nibble
+	NSA 
+	AND #0FH
+	CMP #9
+	BHI ascii_letter
+	ORA #30H ; to ascii 
+	STA tmp+1
+	BRA low_nibble
+ascii_letter:
+	SUB #9
+	ORA #60H
+	STA tmp+1
+low_nibble:
+	LDA tmp+0 ; High nibble
+	AND #0FH
+	CMP #9
+	BHI ascii_letter1
+	ORA #30H ; to ascii 
+	STA tmp+0
+	RTS
+ascii_letter1:
+	SUB #9
+	ORA #60H
+	STA tmp+0
+	RTS
+	
+
+;**********************************MEDIA LAT CALC*****************************************************
+calc_media_lat:
+	
+	LDA latitude1+0
+	STA tmp+0
+	LDA latitude1+1
+	STA tmp+1
+	LDA latitude1+2
+	STA tmp+2
+	LDA latitude1+3
+	STA tmp+3
+	
+	LDA latitude2+0
+	STA tmp_1+0
+	LDA latitude2+1
+	STA tmp_1+1
+	LDA latitude2+2
+	STA tmp_1+2
+	LDA latitude2+3
+	STA tmp_1+3
+	
+	BRCLR LAT1,signos,tla1
+	BRSET LAT1,signos,tla2
+tla1:	BRCLR LAT2,signos,add_lat
+	BRA sub_lat
+tla2: BRSET LAT2,signos,add_lat
+	BRA sub_lat	
+
+add_lat:	
+	JSR add_32bit
+	BRA rolat
+	
+sub_lat:
+
+cal_mlat1:	 			 			
+	LDA tmp+0 ;  
+	CMP tmp_1+0
+	BEQ cmlat2 
+	BHI calcmlat ; LAT1 > LAT2
+	JMP s1
+cmlat2:LDA tmp+1
+	CMP tmp_1+1
+	BEQ cmlat3       
+	BHI calcmlat ;  LAT1 > LAT2
+	BRA s1 ;  LAT1 < LAT2
+cmlat3:LDA tmp+2
+	CMP tmp_1+2
+	BEQ cmlat4       
+	BHI calcmlat ;   LAT1 > LAT2
+	BRA s1 ;  LAT1 < LAT2	
+cmlat4:LDA tmp+3
+	CMP tmp_1+3
+	BEQ calcmlat ;  LAT1 = LAT2	
+	BHI calcmlat ;   LAT1 > LAT2
+	BRA s1 ;   LAT1 < LAT2	
+
+s1:
+	LDA latitude2+0
+	STA tmp+0
+	LDA latitude2+1
+	STA tmp+1
+	LDA latitude2+2
+	STA tmp+2
+	LDA latitude2+3
+	STA tmp+3
+	
+	LDA latitude1+0
+	STA tmp_1+0
+	LDA latitude1+1
+	STA tmp_1+1
+	LDA latitude1+2
+	STA tmp_1+2
+	LDA latitude1+3
+	STA tmp_1+3	
+
+calcmlat:	
+	JSR sub_32bit
+		
+rolat:	LSR tmp+0 ; phi_m/2
+	ROR tmp+1
+	ROR tmp+2
+	ROR tmp+3
+	
+	LDA tmp+0 ;load new phi_/m/2
+	STA media_lat+0
+	LDA tmp+1
+	STA media_lat+1
+	LDA tmp+2
+	STA media_lat+2
+	LDA tmp+3
+	STA media_lat+3
+	RTS
 ;**********************************MAGNITUD VECTOR SUBROUTINE******************************************
 ;X0=magnitud <=delta_lat ; Y0=tmp_2 <= delta_long
 calc_magnitude:
@@ -3947,18 +4580,13 @@ mul10:   LDX tmp+3 ; byte 1 * 10
 Fin:   ;JMP Fin	   
 	   RTS ; return from subroutine 
 
-		 
-;****************************COORDINATES****************************** 
-LONGITUDE_1: FCB '0.00000',0;  
-LATITUDE_1:  FCB '0.00000',0;
-LONGITUDE_2: FCB '-180.00000',0;
-LATITUDE_2:  FCB '-180.00000',0;
+
 
 ;*******************************ARCTAN********************************
-ARCTAN: FCB '45.00000',0,'26.56505',0,'14.03624',0,'7.12501',0 ;4 values
-		FCB '3.57633',0,'1.78991',0,'0.89517',0,'0.44761',0 ;4 values
-		FCB '0.22381',0,'0.11190',0,'0.05595',0,'0.02797',0 ;4 values
-		FCB '0.01398',0,'0.00699',0,'0.003497',0,'0.00174',0  ;4 values
+ARCTAN: FCB '45.00000',0,'26.56505',0,'14.03624',0,'7.12501',0,'3.57635',0,'1.78991',0,'0.89517',0,'0.44761',0
+		FCB '0.22381',0,'0.11191',0,'0.05595',0,'0.02798',0,'0.01398',0,'0.00699',0,'0.00350',0,'0.00175',0
+		FCB '0.00087',0,'0.00044',0,'0.00022',0,'0.00011',0,'0.00005',0,'0.00003',0,'0.00001',0 
+		;22 datos
 			
             ORG	0FFFEH
 			FCB START			; Reset
