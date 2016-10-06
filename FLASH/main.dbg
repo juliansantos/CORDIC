@@ -3275,7 +3275,7 @@ z DS 4
 		 
 ;****************************COORDINATES****************************** 
 LONGITUDE_1: FCB '0.00000',0;  
-LATITUDE_1:  FCB '0.00000',0;
+LATITUDE_1:  FCB '90.00000',0;
 LONGITUDE_2: FCB '0.00000',0;
 LATITUDE_2:  FCB '0.00000',0;
 
